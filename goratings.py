@@ -23,6 +23,10 @@ class Database:
         db = client.GetDatabases(name='Sid')[0]
         self.players_table = db.GetTables(name='players')[0]
         self.games_table = db.GetTables(name='games')[0]
+        # Mapping of ratings to kyu and dan grades.
+        self.grades = dict([(x, str(20 - (x-100)/100)+'k')
+                 for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
+                 for x in range(2100, 2800, 100)] + [(0, '20k')])
     
     def SyncRatings(self):
         """Synchronizes the Rating in the Players worksheet
@@ -38,6 +42,27 @@ class Database:
             player_row.Push()
             game_row.Push()
 
+    def AddPlayer(self):
+        v = 'n'
+        while v != 'y':
+            lastname = raw_input('Last name: ')
+            firstnames = raw_input('First name(s): ')
+            rating = int(raw_input('Rating: '))
+            v = raw_input('Are the entries correct?(y/n) ')
+        while True:
+            newid = str(random.randint(100, 999))
+            query = 'id ==' + str(newid)
+            if not self.players_table.FindRecords(query):
+                break
+        self.players_table.AddRecord({'id': newid, 'lastname': lastname,
+                                         'firstnames': firstnames, 'rating':
+                                            str(rating), 'grade':
+                                            self.grades[rating]})
+        self.games_table.AddRecord({'player': newid, 'baserating':
+                                          str(rating)})
+        
+    #TODO: add def SanityCheck() for ids in players and games, ratings
+    
     
 class Player:
     """Player class has the main attribute, rating.
@@ -55,10 +80,6 @@ class Player:
         self.rating = rating
         self.pid = str(pid)
         self.db = db
-        # Mapping of ratings to kyu and dan grades.
-        self.grades = dict([(x, str(20 - (x-100)/100)+'k')
-                 for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
-                 for x in range(2100, 2800, 100)] + [(0, '20k')])
         
         if self.db and not isinstance(self.db, Database):
             raise RuntimeError('There is no Database instance.')
@@ -66,25 +87,16 @@ class Player:
             query = 'player == ' + self.pid    
             try:
                 record = self.db.games_table.FindRecords(query)[0]   
-                self.rating = record.content['baserating']
+                self.rating = int(record.content['baserating'])
             except:
                 pass
         if self.rating is None:
             raise RuntimeError(
                 'Player has no rating or there is no such player.')
         elif self.rating < 100 or self.rating >= 2800:
+            print self.rating
             raise RuntimeError('Rating is out of range.')
             
-    def AddPlayer(self, lastname=None, firstnames=None, rating=None):
-        self.pid = str(random.randint(100, 999))
-        # TODO: check for existing pid
-        self.db.players_table.AddRecord({'id': self.pid, 'lastname': lastname,
-                                         'firstnames': firstnames, 'rating':
-                                            str(rating), 'grade':
-                                            self.grades[rating]})
-        self.db.games_table.AddRecord({'player': self.pid, 'baserating':
-                                          str(rating)})
-        
     def UpdateRating(self, increment):
         query = 'id == ' + self.pid
         record = self.db.players_table.FindRecords(query)[0]
@@ -93,7 +105,7 @@ class Player:
         if newrating < 100:
             newrating = 100
         record.content['rating'] = str(round(newrating, 1))
-        record.content['grade'] = self.grades[int(newrating)/100*100]
+        record.content['grade'] = self.db.grades[int(newrating)/100*100]
         print record.content['lastname'], increment
         record.Push()
 
@@ -132,9 +144,9 @@ class Game:
         """
         
         swapped = 0
-        ra = int(self.player1.rating)
-        rb = int(self.player2.rating)
-        winner = int(self.winner.rating)
+        ra = self.player1.rating
+        rb = self.player2.rating
+        winner = self.winner.rating
         if ra > rb:
             #ra must always be less than rb
             ra, rb = rb, ra    
@@ -155,29 +167,42 @@ class Game:
         else:
             sab = 1
             saa = 0
+        assert saa + sab == 1
         #new rating of player1    
         ranew = ra + self.Con(ra)*(saa-sea)*self.tc   
         #new rating of player2
-        rbnew = rb + self.Con(rb)*(sab-seb)*self.tc   
+        rbnew = rb + self.Con(rb)*(sab-seb)*self.tc
+        assert ranew < ra or rbnew < rb
+        assert ranew > ra or rbnew > rb
         if swapped:
             return rbnew-rb, ranew-ra
         else:
             return ranew-ra, rbnew-rb
 
+def parse_game(entry):
+    """Parse a game result code.
+    
+    Code example: 330+5a
+    
+    '330' is a player's ID in the database, '5' is the handicap and 'a'
+    is the tournament class.
+    """
+    
+    tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
+    game = entry.split('+')
+    player_id = game[0].strip()
+    handicap = int(game[1][0])
+    tourney_class = tourney_classes[game[1][1].strip()]
+    return player_id, handicap, tourney_class
 
 def main():
-    phgo = Database(user='phgo.ratings@gmail.com', pasw='')
-    tourney_class = {'a': 1.0, 'b': 0.75, 'c': 0.5}
-    games = phgo.games_table.FindRecords('baserating != ""')
+    phgo = Database(user='', pasw='')
+    games = phgo.games_table.FindRecords('games != ""')
     for row in games:
         player1 = Player(pid=row.content['player'], db=phgo)
-        if row.content['games'] is None: continue
-        #Parse the game results
         for g in row.content['games'].split(','):   
-            game = g.split('+')
-            player2 = Player(pid=game[0].strip(), db=phgo)
-            h = int(game[1][0])
-            t = tourney_class[game[1][1].strip()]
+            p, h, t = parse_game(g)
+            player2 = Player(pid=p, db=phgo)
             match = Game(player1, player2, winner=player1, handi=h, tc=t)
             increment1, increment2 = match.Rate()
             player1.UpdateRating(increment1)
