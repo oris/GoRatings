@@ -12,9 +12,9 @@ import random
 import math
 
 class Database:
-    """Database specifies the Google spreadsheet that stores player data.
+    """Provides interface to a database.
     
-    Methods are for general database management.
+    The database used now is a Google spreadsheet.
     """
     
     def __init__(self, user=None, pasw=None):
@@ -32,7 +32,6 @@ class Database:
         """Synchronizes the Rating in the Players worksheet
         and the Base Rating in the Games worksheet.
         """
-        
         for player_row in self.players_table.FindRecords('id != ""'):
             rating = float(player_row.content['rating'])
             player_row.content['rating'] = str(round(rating))
@@ -60,21 +59,52 @@ class Database:
                                             self.grades[rating]})
         self.games_table.AddRecord({'player': newid, 'baserating':
                                           str(rating)})
+    
+    def GetRating(self, pid):
+        """Get base rating from games worksheet.
+        """
+        player = self.games_table.FindRecords('player == ' + str(pid))[0]
+        return int(player.content['baserating'])
         
+    def GetGames(self):
+        """Get game results from games worksheet.
+        
+        Returns a list of tuples: player1, player2, handi, tc
+        """
+        results = []
+        tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
+        games = self.games_table.FindRecords('games != ""')
+        for row in games:
+            player1 = row.content['player']
+            for g in row.content['games'].split(','):
+                game = g.split('+')
+                player2 = game[0].strip()
+                h = int(game[1][0])
+                t = tourney_classes[game[1][1].strip()]
+                results.append((player1, player2, h, t))
+        return results
+        
+    def UpdateRating(self, pid, increment):
+        record = self.players_table.FindRecords('id == ' + str(pid))[0]
+        rating = float(record.content['rating'])
+        newrating = rating + increment
+        if newrating < 100:
+            newrating = 100
+        record.content['rating'] = str(round(newrating, 1))
+        record.content['grade'] = self.grades[int(newrating)/100*100]
+        print record.content['lastname'], increment
+#        record.Push()
+
     #TODO: add def SanityCheck() for ids in players and games, ratings
     
     
 class Player:
-    """Player class has the main attribute, rating.
-    """
-    
     def __init__(self, rating=None, pid=None, db=None):
         """Pass the argument, rating, to test. Pass pid and db arguments
         to retrieve rating from the database.
         
         db must be an instance of Database Class.
         """
-        
         self.rating = rating
         self.pid = str(pid)
         self.db = db
@@ -82,10 +112,8 @@ class Player:
         if self.db and not isinstance(self.db, Database):
             raise RuntimeError('There is no Database instance.')
         if self.pid:
-            query = 'player == ' + self.pid    
             try:
-                record = self.db.games_table.FindRecords(query)[0]   
-                self.rating = int(record.content['baserating'])
+                self.rating = self.db.GetRating(self.pid)
             except:
                 pass
         if self.rating is None:
@@ -96,17 +124,8 @@ class Player:
             raise RuntimeError('Rating is out of range.')
             
     def UpdateRating(self, increment):
-        query = 'id == ' + self.pid
-        record = self.db.players_table.FindRecords(query)[0]
-        rating = float(record.content['rating'])
-        newrating = rating + increment
-        if newrating < 100:
-            newrating = 100
-        record.content['rating'] = str(round(newrating, 1))
-        record.content['grade'] = self.db.grades[int(newrating)/100*100]
-        print record.content['lastname'], increment
-        record.Push()
-
+        self.db.UpdateRating(self.pid, increment)
+    
   
 class Game:
     """Game class for games played. 
@@ -130,7 +149,6 @@ class Game:
         """Internal function that returns an integer as a parameter
         in the computation of ratings.
         """
-        
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
         return conlist[rating/100-1] - (rating - ((rating/100)*100)) / \
@@ -140,7 +158,6 @@ class Game:
         """
         Computes the player rating.
         """
-        
         swapped = 0
         ra = self.player1.rating
         rb = self.player2.rating
@@ -179,35 +196,17 @@ class Game:
         else:
             return ranew-ra, rbnew-rb
 
-def parse_game(entry):
-    """Parse a game result code.
-    
-    Code example: 330+5a
-    
-    '330' is a player's ID in the database, '5' is the handicap and 'a'
-    is the tournament class.
-    """
-    
-    tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
-    game = entry.split('+')
-    player_id = game[0].strip()
-    handicap = int(game[1][0])
-    tourney_class = tourney_classes[game[1][1].strip()]
-    return player_id, handicap, tourney_class
 
 def main():
     phgo = Database(user='', pasw='')
-    games = phgo.games_table.FindRecords('games != ""')
-    for row in games:
-        player1 = Player(pid=row.content['player'], db=phgo)
-        for g in row.content['games'].split(','):   
-            p, h, t = parse_game(g)
-            player2 = Player(pid=p, db=phgo)
-            match = Game(player1, player2, winner=player1, handi=h, tc=t)
-            increment1, increment2 = match.Rate()
-            player1.UpdateRating(increment1)
-            player2.UpdateRating(increment2)
-
+    games = phgo.GetGames()
+    for p1, p2, h, t in games:
+        player1, player2 = Player(pid=p1, db=phgo), Player(pid=p2, db=phgo)
+        match = Game(player1, player2, winner=player1, handi=h, tc=t)
+        increment1, increment2 = match.Rate()
+        player1.UpdateRating(increment1)
+        player2.UpdateRating(increment2)
+        
     
 if __name__ == '__main__':
     main()
