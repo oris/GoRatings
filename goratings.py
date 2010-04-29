@@ -66,8 +66,6 @@ class Database:
     
 class Player:
     """Player class has the main attribute, rating.
-    
-    Methods include adding players and updating ratings in the database.
     """
     
     def __init__(self, rating=None, pid=None, db=None):
@@ -167,11 +165,13 @@ class Game:
         else:
             sab = 1
             saa = 0
+        #There can be only one winner.
         assert saa + sab == 1
         #new rating of player1    
         ranew = ra + self.Con(ra)*(saa-sea)*self.tc   
         #new rating of player2
         rbnew = rb + self.Con(rb)*(sab-seb)*self.tc
+        #Players must not be both gainers or both losers in ratings.
         assert ranew < ra or rbnew < rb
         assert ranew > ra or rbnew > rb
         if swapped:
