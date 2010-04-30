@@ -50,8 +50,7 @@ class Database:
             v = raw_input('Are the entries correct?(y/n) ')
         while True:
             newid = str(random.randint(100, 999))
-            query = 'id ==' + str(newid)
-            if not self.players_table.FindRecords(query):
+            if not self.players_table.FindRecords('id == ' + str(newid)):
                 break
         self.players_table.AddRecord({'id': newid, 'lastname': lastname,
                                          'firstnames': firstnames, 'rating':
@@ -93,9 +92,7 @@ class Database:
         record.content['rating'] = str(round(newrating, 1))
         record.content['grade'] = self.grades[int(newrating)/100*100]
         print record.content['lastname'], increment
-#        record.Push()
-
-    #TODO: add def SanityCheck() for ids in players and games, ratings
+        record.Push()
     
     
 class Player:
@@ -130,16 +127,21 @@ class Player:
 class Game:
     """Game class for games played. 
     
-    Attributes player1 and player2 must be passed as Player class instances.
-    
+    Attributes player1 and player2 may be passed as Player class instances.
+        
     Method that computes the rating out of a game result. The equations used
     are from the European Go Federation ratings system. Thanks EGF!
     """
     
     def __init__(self, player1, player2, winner, handi=0, tc=1):
-        self.player1 = player1
-        self.player2 = player2
-        self.winner = winner
+        if isinstance(player1, Player) and isinstance(player2, Player):
+            self.rating1 = player1.rating
+            self.rating2 = player2.rating
+            self.winner = winner.rating
+        else:
+            self.rating1 = int(player1)
+            self.rating2 = int(player2)
+            self.winner = int(winner)
         # Number of handicap stones
         self.handi = handi
         # EGF's Tournament Class parameter
@@ -159,9 +161,9 @@ class Game:
         Computes the player rating.
         """
         swapped = 0
-        ra = self.player1.rating
-        rb = self.player2.rating
-        winner = self.winner.rating
+        ra = self.rating1
+        rb = self.rating2
+        winner = self.winner
         if ra > rb:
             #ra must always be less than rb
             ra, rb = rb, ra    
