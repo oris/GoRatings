@@ -94,6 +94,14 @@ class Database:
         print record.content['lastname'], increment
         record.Push()
     
+    def Publish(self):
+        rows = self.players_table.FindRecords('id != ""')
+        for row in rows:
+            if '.' in row.content['rating']:
+                rounded = round(float(row.content['rating']))
+                row.content['rating'] = rounded
+                row.Push()
+    
     
 class Player:
     def __init__(self, rating=None, pid=None, db=None):
