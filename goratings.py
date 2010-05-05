@@ -110,7 +110,7 @@ class Player:
         
         db must be an instance of Database Class.
         """
-        self.rating = rating
+        self.rating = float(rating)
         self.pid = str(pid)
         self.db = db
         
@@ -118,7 +118,7 @@ class Player:
             raise RuntimeError('There is no Database instance.')
         if self.pid:
             try:
-                self.rating = self.db.GetRating(self.pid)
+                self.rating = float(self.db.GetRating(self.pid))
             except:
                 pass
         if self.rating is None:
@@ -147,9 +147,9 @@ class Game:
             self.rating2 = player2.rating
             self.winner = winner.rating
         else:
-            self.rating1 = int(player1)
-            self.rating2 = int(player2)
-            self.winner = int(winner)
+            self.rating1 = float(player1)
+            self.rating2 = float(player2)
+            self.winner = float(winner)
         # Number of handicap stones
         self.handi = handi
         # EGF's Tournament Class parameter
@@ -159,10 +159,11 @@ class Game:
         """Internal function that returns an integer as a parameter
         in the computation of ratings.
         """
+        index = int(rating)/100
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
-        return conlist[rating/100-1] - (float(rating) - ((rating/100)*100)) / \
-                    (100/(conlist[(rating/100)-1]-conlist[rating/100]))
+        return conlist[index-1] - (rating - (index*100)) / \
+                    (100/(conlist[index-1]-conlist[index]))
     
     def Rate(self):
         """
@@ -182,7 +183,7 @@ class Game:
             d = rb - ra - 100*(self.handi-0.5)
         else:
             d = rb - ra
-        a = 200 - ((rb-d)-100)/20.0
+        a = 200 - ((rb-d)-100)/20
         E = 0.016
         #winning chances of player1
         sea = 1/(math.exp(d/a)+1) - E/2
