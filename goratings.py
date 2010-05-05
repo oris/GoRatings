@@ -161,12 +161,14 @@ class Game:
         """
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
-        return conlist[rating/100-1] - (rating - ((rating/100)*100)) / \
+        return conlist[rating/100-1] - (float(rating) - ((rating/100)*100)) / \
                     (100/(conlist[(rating/100)-1]-conlist[rating/100]))
     
     def Rate(self):
         """
         Computes the player rating.
+        
+        See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
         swapped = 0
         ra = self.rating1
