@@ -133,8 +133,8 @@ class Game:
         See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
         swapped = 0
+        #self.rating1 must always be less than self.rating2
         if self.rating1 > self.rating2:
-            #ra must always be less than rb
             self.rating1, self.rating2 = self.rating2, self.rating1    
             swapped = 1
         if self.handi:
