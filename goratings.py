@@ -8,8 +8,7 @@ Computes ELO-based ratings for go players.
 """
 
 import gdata.spreadsheet.text_db
-import random
-import math
+import math, random
 
 class Database:
     """Provides interface to a database.
@@ -42,45 +41,47 @@ class Database:
             game_row.Push()
 
     def AddPlayer(self):
-        v = 'n'
-        while v != 'y':
+        verify = 'n'
+        while verify != 'y':
             lastname = raw_input('Last name: ')
             firstnames = raw_input('First name(s): ')
             rating = int(raw_input('Rating: '))
-            v = raw_input('Are the entries correct?(y/n) ')
+            verify = raw_input('Are the entries correct?(y/n) ')
         while True:
-            newid = str(random.randint(100, 999))
-            if not self.players_table.FindRecords('id == ' + str(newid)):
+            new_id = str(random.randint(100, 999))
+            if not self.players_table.FindRecords('id == ' + str(new_id)):
                 break
-        self.players_table.AddRecord({'id': newid, 'lastname': lastname,
+        self.players_table.AddRecord({'id': new_id, 'lastname': lastname,
                                          'firstnames': firstnames, 'rating':
                                             str(rating), 'grade':
                                             self.grades[rating]})
-        self.games_table.AddRecord({'player': newid, 'baserating':
+        self.games_table.AddRecord({'player': new_id, 'baserating':
                                           str(rating)})
     
-    def GetRating(self, pid):
+    def GetRating(self, player_id):
         """Get base rating from games worksheet.
         """
-        player = self.games_table.FindRecords('player == ' + str(pid))[0]
-        return int(player.content['baserating'])
+        player = self.games_table.FindRecords('player == ' + str(player_id))[0]
+        return player.content['baserating']
         
     def GetGames(self):
         """Get game results from games worksheet.
         
-        Returns a list of tuples: player1, player2, handi, tc
+        Returns a list of tuples.
         """
         results = []
         tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
         games = self.games_table.FindRecords('games != ""')
         for row in games:
-            player1 = row.content['player']
+            player_id1 = row.content['player']
+            rating1 = self.GetRating(player_id1) 
             for g in row.content['games'].split(','):
                 game = g.split('+')
                 player2 = game[0].strip()
-                h = int(game[1][0])
+                rating2 = self.GetRating(player_id2)
+                h = game[1][0]
                 t = tourney_classes[game[1][1].strip()]
-                results.append((player1, player2, h, t))
+                results.append((player1, rating1, player2, rating2, h, t))
         return results
         
     def UpdateRating(self, pid, increment):
@@ -102,58 +103,18 @@ class Database:
                 row.content['rating'] = rounded
                 row.Push()
     
-    
-class Player:
-    def __init__(self, rating=None, pid=None, db=None):
-        """Pass the argument, rating, to test. Pass pid and db arguments
-        to retrieve rating from the database.
-        
-        db must be an instance of Database Class.
-        """
-        self.rating = float(rating)
-        self.pid = str(pid)
-        self.db = db
-        
-        if self.db and not isinstance(self.db, Database):
-            raise RuntimeError('There is no Database instance.')
-        if self.pid:
-            try:
-                self.rating = float(self.db.GetRating(self.pid))
-            except:
-                pass
-        if self.rating is None:
-            raise RuntimeError(
-                'Player has no rating or there is no such player.')
-        elif self.rating < 100 or self.rating >= 2800:
-            print self.rating
-            raise RuntimeError('Rating is out of range.')
-            
-    def UpdateRating(self, increment):
-        self.db.UpdateRating(self.pid, increment)
-    
   
 class Game:
     """Game class for games played. 
     
-    Attributes player1 and player2 may be passed as Player class instances.
-        
-    Method that computes the rating out of a game result. The equations used
-    are from the European Go Federation ratings system. Thanks EGF!
+    It has the method that computes the rating out of a game result.
     """
-    
-    def __init__(self, player1, player2, winner, handi=0, tc=1):
-        if isinstance(player1, Player) and isinstance(player2, Player):
-            self.rating1 = player1.rating
-            self.rating2 = player2.rating
-            self.winner = winner.rating
-        else:
-            self.rating1 = float(player1)
-            self.rating2 = float(player2)
-            self.winner = float(winner)
-        # Number of handicap stones
-        self.handi = handi
-        # EGF's Tournament Class parameter
-        self.tc = tc
+    def __init__(self, rating1, rating2, winner, handi=0, tc=1):
+        self.rating1 = float(rating1)
+        self.rating2 = float(rating2)
+        self.winner = float(winner)
+        self.handi = int(handi)
+        self.tc = float(tc)
     
     def Con(self, rating):
         """Internal function that returns an integer as a parameter
@@ -162,8 +123,8 @@ class Game:
         index = int(rating)/100
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
-        return conlist[index-1] - (rating - (index*100)) / \
-                    (100/(conlist[index-1]-conlist[index]))
+        return (conlist[index-1] - (rating - ((rating/100)*100)) /
+                (100/(conlist[index-1]-conlist[index])))
     
     def Rate(self):
         """
@@ -172,54 +133,51 @@ class Game:
         See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
         swapped = 0
-        ra = self.rating1
-        rb = self.rating2
-        winner = self.winner
-        if ra > rb:
+        if self.rating1 > self.rating2:
             #ra must always be less than rb
-            ra, rb = rb, ra    
+            self.rating1, self.rating2 = self.rating2, self.rating1    
             swapped = 1
         if self.handi:
-            d = rb - ra - 100*(self.handi-0.5)
+            d = self.rating2 - self.rating1 - 100*(self.handi-0.5)
         else:
-            d = rb - ra
-        a = 200 - ((rb-d)-100)/20
+            d = self.rating2 - self.rating1
+        a = 200 - ((self.rating2-d)-100)/20
         E = 0.016
-        #winning chances of player1
-        sea = 1/(math.exp(d/a)+1) - E/2
-        #winning chances of player2
-        seb = 1 - sea - E                  
-        if winner == ra:
-            saa = 1
-            sab = 0
+        chances1 = 1/(math.exp(d/a)+1) - E/2
+        chances2 = 1 - chances1 - E                  
+        if self.winner == self.rating1:
+            result1 = 1
+            result2 = 0
         else:
-            sab = 1
-            saa = 0
+            result2 = 1
+            result1 = 0
         #There can be only one winner.
-        assert saa + sab == 1
-        #new rating of player1    
-        ranew = ra + self.Con(ra)*(saa-sea)*self.tc   
-        #new rating of player2
-        rbnew = rb + self.Con(rb)*(sab-seb)*self.tc
+        assert result1 + result2 == 1
+        new_rating1 = (self.rating1 + self.Con(self.rating1) *
+                       (result1-chances1)*self.tc)
+        new_rating2 = (self.rating2 + self.Con(self.rating2) *
+                       (result2-chances2)*self.tc)
         #Players must not be both gainers or both losers in ratings.
-        assert ranew < ra or rbnew < rb
-        assert ranew > ra or rbnew > rb
+        assert new_rating1 < self.rating1 or new_rating2 < self.rating2
+        assert new_rating1 > self.rating1 or new_rating2 > self.rating2
+        increment1 = new_rating1 - self.rating1
+        increment2 = new_rating2 - self.rating2
+        print(a, chances1, chances2, self.Con(self.rating1),
+              self.Con(self.rating2))
         if swapped:
-            return rbnew-rb, ranew-ra
+            return increment2, increment1
         else:
-            return ranew-ra, rbnew-rb
+            return increment1, increment2
 
 
 def main():
     phgo = Database(user='', pasw='')
     games = phgo.GetGames()
-    for p1, p2, h, t in games:
-        player1, player2 = Player(pid=p1, db=phgo), Player(pid=p2, db=phgo)
-        match = Game(player1, player2, winner=player1, handi=h, tc=t)
+    for player_id1, rating1, player_id2, rating2, handi, tc in games:
+        match = Game(rating1, rating2, winner=rating1, handi=handi, tc=tc)
         increment1, increment2 = match.Rate()
-        player1.UpdateRating(increment1)
-        player2.UpdateRating(increment2)
-        
+        phgo.UpdateRating(player_id1, increment1)
+        phgo.UpdateRating(player_id2, increment2)
     
 if __name__ == '__main__':
     main()

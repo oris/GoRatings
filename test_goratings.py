@@ -1,13 +1,11 @@
 """Unit tests for goratings.py
 """
 
-from goratings import Player, Game
+from goratings import Game
 from nose.tools import assert_almost_equal
 
 def rate(rating1, rating2, known_value1, known_value2, h=0, t=1):
-    player1 = Player(rating1)
-    player2 = Player(rating2)
-    game = Game(player1, player2, winner=player1, handi=h, tc=t)
+    game = Game(rating1, rating2, winner=rating1, handi=h, tc=t)
     inc1, inc2 = game.Rate()
     assert_almost_equal(inc1, known_value1, places=2)
     assert_almost_equal(inc2, known_value2, places=2)
