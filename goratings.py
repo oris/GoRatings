@@ -123,7 +123,7 @@ class Game:
         index = int(rating)/100
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
-        return (conlist[index-1] - (rating - ((rating/100)*100)) /
+        return (conlist[index-1] - (rating - (index*100)) /
                 (100/(conlist[index-1]-conlist[index])))
     
     def Rate(self):
