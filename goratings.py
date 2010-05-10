@@ -13,7 +13,7 @@ import math, random
 class Database:
     """Provides interface to a database.
     
-    The database used now is a Google spreadsheet.
+    The database being used now is a Google spreadsheet.
     """
     
     def __init__(self, user=None, pasw=None):
@@ -24,8 +24,8 @@ class Database:
         self.games_table = db.GetTables(name='games')[0]
         # Mapping of ratings to kyu and dan grades.
         self.grades = dict([(x, str(20 - (x-100)/100)+'k')
-                 for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
-                 for x in range(2100, 2800, 100)] + [(0, '20k')])
+               for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
+               for x in range(2100, 2800, 100)] + [(0, '20k')])
     
     def SyncRatings(self):
         """Synchronizes the Rating in the Players worksheet
@@ -61,7 +61,8 @@ class Database:
     def GetRating(self, player_id):
         """Get base rating from games worksheet.
         """
-        player = self.games_table.FindRecords('player == ' + str(player_id))[0]
+        player = self.games_table.FindRecords(
+                                             'player == ' + str(player_id))[0]
         return player.content['baserating']
         
     def GetGames(self):
@@ -117,7 +118,7 @@ class Game:
         self.tc = float(tc)
     
     def Con(self, rating):
-        """Internal function that returns an integer as a parameter
+        """Internal function that returns a float as a parameter
         in the computation of ratings.
         """
         index = int(rating)/100
@@ -162,8 +163,6 @@ class Game:
         assert new_rating1 > self.rating1 or new_rating2 > self.rating2
         increment1 = new_rating1 - self.rating1
         increment2 = new_rating2 - self.rating2
-        print(a, chances1, chances2, self.Con(self.rating1),
-              self.Con(self.rating2))
         if swapped:
             return increment2, increment1
         else:
