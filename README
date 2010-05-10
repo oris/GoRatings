@@ -1,0 +1,14 @@
+This is a "simple" application to compute ELO-based rating for go players. It
+requires Python and Google Spreadsheet to run. Presently, you need to know
+Python and you need to be familiar with the Linux command line to use it.
+
+To compute ratings, you feed game results to the program. Game results consist
+of the two players's id or ratings, the winner, the number of handicap and the
+game condition. The player's id is his id in the database. The game conditions
+are categorized into three tournament classes based mainly on the time limit
+used in the game.
+
+This system is based on the European Go Federation ratings system.
+http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
+
+
