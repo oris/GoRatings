@@ -17,15 +17,11 @@ class Database:
     """
     
     def __init__(self, user=None, pasw=None):
-        client = gdata.spreadsheet.text_db.DatabaseClient(username=user,
+        self.client = gdata.spreadsheet.text_db.DatabaseClient(username=user,
                     password=pasw)
-        db = client.GetDatabases(name='Sid')[0]
-        self.players_table = db.GetTables(name='players')[0]
-        self.games_table = db.GetTables(name='games')[0]
-        # Mapping of ratings to kyu and dan grades.
-        self.grades = dict([(x, str(20 - (x-100)/100)+'k')
-               for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
-               for x in range(2100, 2800, 100)] + [(0, '20k')])
+        self.db = self.client.GetDatabases(name='Sid')[0]
+        self.players_table = self.db.GetTables(name='players')[0]
+        self.games_table = self.db.GetTables(name='games')[0]
     
     def SyncRatings(self):
         """Synchronizes the Rating in the Players worksheet
@@ -86,6 +82,10 @@ class Database:
         return results
         
     def UpdateRating(self, pid, increment):
+        # Mapping of ratings to kyu and dan grades.
+        self.grades = dict([(x, str(20 - (x-100)/100)+'k')
+               for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
+               for x in range(2100, 2800, 100)] + [(0, '20k')])
         record = self.players_table.FindRecords('id == ' + str(pid))[0]
         rating = float(record.content['rating'])
         newrating = rating + increment
@@ -116,7 +116,20 @@ class Game:
         self.winner = float(winner)
         self.handi = int(handi)
         self.tc = float(tc)
+        self.CheckParams()
     
+    def CheckParams(self):
+        if self.rating1 < 100 or self.rating1 > 2800:
+            raise RuntimeError('rating out of range')
+        if self.rating2 < 100 or self.rating2 > 2800:
+            raise RuntimeError('rating out of range')
+        if self.winner not in (self.rating1, self.rating2):
+            raise RuntimeError('winner is not one of the players')
+        if self.handi < 0 or self.handi > 9:
+            raise RuntimeError('improper handicap')
+        if self.tc not in [0.5, 0.75, 1.0]:
+            raise RuntimeError('improper tournament class')
+        
     def Con(self, rating):
         """Internal function that returns a float as a parameter
         in the computation of ratings.
@@ -133,11 +146,11 @@ class Game:
         
         See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
-        swapped = 0
+        SWAPPED = 0
         #self.rating1 must always be less than self.rating2
         if self.rating1 > self.rating2:
             self.rating1, self.rating2 = self.rating2, self.rating1    
-            swapped = 1
+            SWAPPED = 1
         if self.handi:
             d = self.rating2 - self.rating1 - 100*(self.handi-0.5)
         else:
@@ -163,7 +176,7 @@ class Game:
         assert new_rating1 > self.rating1 or new_rating2 > self.rating2
         increment1 = new_rating1 - self.rating1
         increment2 = new_rating2 - self.rating2
-        if swapped:
+        if SWAPPED:
             return increment2, increment1
         else:
             return increment1, increment2
