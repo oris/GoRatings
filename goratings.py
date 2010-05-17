@@ -8,21 +8,25 @@ Computes ELO-based ratings for go players.
 """
 
 import gdata.spreadsheet.text_db
-import math, random
+import math
+import random
+import optparse
+import sys
+
 
 class Database:
     """Provides interface to a database.
-    
+
     The database being used now is a Google spreadsheet.
     """
-    
+
     def __init__(self, user=None, pasw=None):
         self.client = gdata.spreadsheet.text_db.DatabaseClient(username=user,
                     password=pasw)
         self.db = self.client.GetDatabases(name='Sid')[0]
         self.players_table = self.db.GetTables(name='players')[0]
         self.games_table = self.db.GetTables(name='games')[0]
-    
+
     def SyncRatings(self):
         """Synchronizes the Rating in the Players worksheet
         and the Base Rating in the Games worksheet.
@@ -53,49 +57,50 @@ class Database:
                                             self.grades[rating]})
         self.games_table.AddRecord({'player': new_id, 'baserating':
                                           str(rating)})
-    
-    def GetRating(self, player_id):
+
+    def GetRating(self, pid):
         """Get base rating from games worksheet.
         """
         player = self.games_table.FindRecords(
-                                             'player == ' + str(player_id))[0]
+                                             'player == ' + str(pid))[0]
         return player.content['baserating']
-        
+
     def GetGames(self):
         """Get game results from games worksheet.
-        
+
         Returns a list of tuples.
         """
         results = []
         tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
         games = self.games_table.FindRecords('games != ""')
         for row in games:
-            player_id1 = row.content['player']
-            rating1 = self.GetRating(player_id1) 
+            pid1 = row.content['player']
+            rating1 = self.GetRating(pid1)
             for g in row.content['games'].split(','):
                 game = g.split('+')
-                player2 = game[0].strip()
-                rating2 = self.GetRating(player_id2)
+                pid2 = game[0].strip()
+                rating2 = self.GetRating(pid2)
                 h = game[1][0]
                 t = tourney_classes[game[1][1].strip()]
-                results.append((player1, rating1, player2, rating2, h, t))
+                results.append((pid1, rating1, pid2, rating2, h, t))
         return results
-        
-    def UpdateRating(self, pid, increment):
+
+    def UpdateRating(self, pid, increment, dry_run):
         # Mapping of ratings to kyu and dan grades.
-        self.grades = dict([(x, str(20 - (x-100)/100)+'k')
-               for x in range(100, 2100, 100)] + [(x, str((x - 2000)/100)+'d')
-               for x in range(2100, 2800, 100)] + [(0, '20k')])
+        self.grades = dict([(x, str(20 - (x - 100) / 100) + 'k')
+            for x in range(100, 2100, 100)] + [(x, str((x - 2000) / 100) + 'd')
+            for x in range(2100, 2800, 100)] + [(0, '20k')])
         record = self.players_table.FindRecords('id == ' + str(pid))[0]
         rating = float(record.content['rating'])
         newrating = rating + increment
         if newrating < 100:
             newrating = 100
         record.content['rating'] = str(round(newrating, 1))
-        record.content['grade'] = self.grades[int(newrating)/100*100]
+        record.content['grade'] = self.grades[int(newrating) / 100 * 100]
         print record.content['lastname'], increment
-        record.Push()
-    
+        if not dry_run:
+            record.Push()
+
     def Publish(self):
         rows = self.players_table.FindRecords('id != ""')
         for row in rows:
@@ -103,13 +108,14 @@ class Database:
                 rounded = round(float(row.content['rating']))
                 row.content['rating'] = rounded
                 row.Push()
-    
-  
+
+
 class Game:
-    """Game class for games played. 
-    
+    """Game class for games played.
+
     It has the method that computes the rating out of a game result.
     """
+
     def __init__(self, rating1, rating2, winner, handi=0, tc=1):
         self.rating1 = float(rating1)
         self.rating2 = float(rating2)
@@ -117,7 +123,7 @@ class Game:
         self.handi = int(handi)
         self.tc = float(tc)
         self.CheckParams()
-    
+
     def CheckParams(self):
         if self.rating1 < 100 or self.rating1 > 2800:
             raise RuntimeError('rating out of range')
@@ -129,36 +135,36 @@ class Game:
             raise RuntimeError('improper handicap')
         if self.tc not in [0.5, 0.75, 1.0]:
             raise RuntimeError('improper tournament class')
-        
+
     def Con(self, rating):
         """Internal function that returns a float as a parameter
         in the computation of ratings.
         """
-        index = int(rating)/100
+        index = int(rating) / 100
         conlist = [116, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 51,
                    47, 43, 39, 35, 31, 27, 24, 21, 18, 15, 13, 11, 10, 10]
-        return (conlist[index-1] - (rating - (index*100)) /
-                (100/(conlist[index-1]-conlist[index])))
-    
+        return (conlist[index - 1] - (rating - (index * 100)) /
+                (100 / (conlist[index - 1] - conlist[index])))
+
     def Rate(self):
         """
         Computes the player rating.
-        
+
         See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
         SWAPPED = 0
         #self.rating1 must always be less than self.rating2
         if self.rating1 > self.rating2:
-            self.rating1, self.rating2 = self.rating2, self.rating1    
+            self.rating1, self.rating2 = self.rating2, self.rating1
             SWAPPED = 1
         if self.handi:
-            d = self.rating2 - self.rating1 - 100*(self.handi-0.5)
+            d = self.rating2 - self.rating1 - 100 * (self.handi-0.5)
         else:
             d = self.rating2 - self.rating1
-        a = 200 - ((self.rating2-d)-100)/20
+        a = 200 - ((self.rating2 - d) - 100) / 20
         E = 0.016
-        chances1 = 1/(math.exp(d/a)+1) - E/2
-        chances2 = 1 - chances1 - E                  
+        chances1 = 1 / (math.exp(d / a) + 1) - E / 2
+        chances2 = 1 - chances1 - E
         if self.winner == self.rating1:
             result1 = 1
             result2 = 0
@@ -168,9 +174,9 @@ class Game:
         #There can be only one winner.
         assert result1 + result2 == 1
         new_rating1 = (self.rating1 + self.Con(self.rating1) *
-                       (result1-chances1)*self.tc)
+                       (result1 - chances1) * self.tc)
         new_rating2 = (self.rating2 + self.Con(self.rating2) *
-                       (result2-chances2)*self.tc)
+                       (result2 - chances2) * self.tc)
         #Players must not be both gainers or both losers in ratings.
         assert new_rating1 < self.rating1 or new_rating2 < self.rating2
         assert new_rating1 > self.rating1 or new_rating2 > self.rating2
@@ -182,14 +188,57 @@ class Game:
             return increment1, increment2
 
 
-def main():
-    phgo = Database(user='', pasw='')
+def process_cmdline(argv):
+    if argv is None:
+        argv = sys.argv[1:]
+    parser = optparse.OptionParser(
+        formatter=optparse.TitledHelpFormatter(width=78),
+        add_help_option=None)
+    parser.add_option('-u', '--username')
+    parser.add_option('-p', '--password')
+    parser.add_option('-a', '--add-player', action='store_true',
+                      dest='add_player')
+    parser.add_option('-s', '--sync-ratings', action='store_true',
+                      dest='sync_ratings')
+    parser.add_option('-b', '--publish', action='store_true')
+    parser.add_option('-d', '--dry-run', action='store_true', dest='dry_run')
+    parser.add_option('-r', '--rate', nargs=5,
+                      metavar='<rating1> <rating2> <winner> <handi> <tc>')
+    parser.add_option('-h', '--help', action='help',
+                      help='Show this help message and exit')
+    opts, args = parser.parse_args(argv)
+    if args:
+        parser.error('program takes no command-line arguments; '
+                     '"%s" ignored.' % (args,))
+    return opts, args
+
+
+def main(argv=None):
+    opts, args = process_cmdline(argv)
+    if opts.rate:
+        rating1, rating2, winner, handi, tc = opts.rate
+        r = Game(rating1, rating2, winner, handi, tc)
+        increment1, increment2 = r.Rate()
+        print increment1, increment2
+        return 0
+    phgo = Database(user=opts.username, pasw=opts.password)
+    if opts.add_player:
+        while True:
+            phgo.AddPlayer()
+            repeat = raw_input('Enter another player?[y/N]')
+            if repeat != 'y':
+                break
+    if opts.sync_ratings:
+        phgo.SyncRatings()
     games = phgo.GetGames()
-    for player_id1, rating1, player_id2, rating2, handi, tc in games:
+    for pid1, rating1, pid2, rating2, handi, tc in games:
         match = Game(rating1, rating2, winner=rating1, handi=handi, tc=tc)
         increment1, increment2 = match.Rate()
-        phgo.UpdateRating(player_id1, increment1)
-        phgo.UpdateRating(player_id2, increment2)
-    
+        phgo.UpdateRating(pid1, increment1, opts.dry_run)
+        phgo.UpdateRating(pid2, increment2, opts.dry_run)
+    return 0
+
+
 if __name__ == '__main__':
-    main()
+    status = main()
+    sys.exit(status)
