@@ -101,6 +101,12 @@ class Database:
         if not dry_run:
             record.Push()
 
+    def CleanUp(self):
+        games = self.games_table.FindRecords('games != ""')
+        for row in games:
+            row.content['games'] = ''
+            row.Push()
+    
     def Publish(self):
         rows = self.players_table.FindRecords('id != ""')
         for row in rows:
@@ -198,8 +204,12 @@ def process_cmdline(argv):
     parser.add_option('-p', '--password')
     parser.add_option('-a', '--add-player', action='store_true',
                       dest='add_player')
+    parser.add_option('--add-player-only', action='store_true',
+                      dest='add_player_only')
     parser.add_option('-s', '--sync-ratings', action='store_true',
                       dest='sync_ratings')
+    parser.add_option('--sync-ratings-only', action='store_true',
+                      dest='sync_ratings_only')
     parser.add_option('-b', '--publish', action='store_true')
     parser.add_option('-d', '--dry-run', action='store_true', dest='dry_run')
     parser.add_option('-r', '--rate', nargs=5,
@@ -207,6 +217,11 @@ def process_cmdline(argv):
     parser.add_option('-h', '--help', action='help',
                       help='Show this help message and exit')
     opts, args = parser.parse_args(argv)
+    if opts.add_player and opts.add_player_only:
+        parser.error('options -a and --add-player-only are mutually exclusive')
+    if opts.sync_ratings and opts.sync_ratings_only:
+        parser.error(
+            'options -s and --sync-ratings-only are mutually exclusive')
     if args:
         parser.error('program takes no command-line arguments; '
                      '"%s" ignored.' % (args,))
@@ -222,20 +237,26 @@ def main(argv=None):
         print increment1, increment2
         return 0
     phgo = Database(user=opts.username, pasw=opts.password)
-    if opts.add_player:
+    if opts.add_player or opts.add_player_only:
         while True:
             phgo.AddPlayer()
             repeat = raw_input('Enter another player?[y/N]')
             if repeat != 'y':
+                if opts.add_player_only:
+                    return 0
                 break
-    if opts.sync_ratings:
+    if opts.sync_ratings or opts.sync_ratings_only:
         phgo.SyncRatings()
+        if opts.sync_ratings_only:
+            return 0
     games = phgo.GetGames()
     for pid1, rating1, pid2, rating2, handi, tc in games:
         match = Game(rating1, rating2, winner=rating1, handi=handi, tc=tc)
         increment1, increment2 = match.Rate()
         phgo.UpdateRating(pid1, increment1, opts.dry_run)
         phgo.UpdateRating(pid2, increment2, opts.dry_run)
+        if not opts.dry_run:
+            phgo.CleanUp()
     return 0
 
 
