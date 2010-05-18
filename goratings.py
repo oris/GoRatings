@@ -106,7 +106,7 @@ class Database:
         for row in games:
             row.content['games'] = ''
             row.Push()
-    
+
     def Publish(self):
         rows = self.players_table.FindRecords('id != ""')
         for row in rows:
@@ -257,6 +257,9 @@ def main(argv=None):
         phgo.UpdateRating(pid2, increment2, opts.dry_run)
         if not opts.dry_run:
             phgo.CleanUp()
+    if opts.publish:
+        if not opts.dry_run:
+            phgo.Publish()
     return 0
 
 
