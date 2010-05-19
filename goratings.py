@@ -73,6 +73,8 @@ class Database:
         results = []
         tourney_classes = {'a': 1.0, 'b': 0.75, 'c': 0.5}
         games = self.games_table.FindRecords('games != ""')
+        if len(games) == 0:
+            raise RuntimeError('no games in database')
         for row in games:
             pid1 = row.content['player']
             rating1 = self.GetRating(pid1)
@@ -217,6 +219,10 @@ def process_cmdline(argv):
     parser.add_option('-h', '--help', action='help',
                       help='Show this help message and exit')
     opts, args = parser.parse_args(argv)
+    if opts.username is None or opts.password is None:
+        parser.error('username and password required')
+    if opts.username != 'phgo.ratings@gmail.com':
+        parser.error('username incorrect')
     if opts.add_player and opts.add_player_only:
         parser.error('options -a and --add-player-only are mutually exclusive')
     if opts.sync_ratings and opts.sync_ratings_only:
