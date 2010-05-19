@@ -144,7 +144,7 @@ class Game:
         if self.tc not in [0.5, 0.75, 1.0]:
             raise RuntimeError('improper tournament class')
 
-    def Con(self, rating):
+    def _con(self, rating):
         """Internal function that returns a float as a parameter
         in the computation of ratings.
         """
@@ -166,7 +166,7 @@ class Game:
             self.rating1, self.rating2 = self.rating2, self.rating1
             SWAPPED = 1
         if self.handi:
-            d = self.rating2 - self.rating1 - 100 * (self.handi-0.5)
+            d = self.rating2 - self.rating1 - 100 * (self.handi - 0.5)
         else:
             d = self.rating2 - self.rating1
         a = 200 - ((self.rating2 - d) - 100) / 20
@@ -181,9 +181,9 @@ class Game:
             result1 = 0
         #There can be only one winner.
         assert result1 + result2 == 1
-        new_rating1 = (self.rating1 + self.Con(self.rating1) *
+        new_rating1 = (self.rating1 + self._con(self.rating1) *
                        (result1 - chances1) * self.tc)
-        new_rating2 = (self.rating2 + self.Con(self.rating2) *
+        new_rating2 = (self.rating2 + self._con(self.rating2) *
                        (result2 - chances2) * self.tc)
         #Players must not be both gainers or both losers in ratings.
         assert new_rating1 < self.rating1 or new_rating2 < self.rating2
