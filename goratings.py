@@ -160,11 +160,11 @@ class Game:
 
         See http://www.europeangodatabase.eu/EGD/EGF_rating_system.php
         """
-        SWAPPED = 0
+        swapped = False
         #self.rating1 must always be less than self.rating2
         if self.rating1 > self.rating2:
             self.rating1, self.rating2 = self.rating2, self.rating1
-            SWAPPED = 1
+            swapped = True
         if self.handi:
             d = self.rating2 - self.rating1 - 100 * (self.handi - 0.5)
         else:
@@ -190,7 +190,7 @@ class Game:
         assert new_rating1 > self.rating1 or new_rating2 > self.rating2
         increment1 = new_rating1 - self.rating1
         increment2 = new_rating2 - self.rating2
-        if SWAPPED:
+        if swapped:
             return increment2, increment1
         else:
             return increment1, increment2
