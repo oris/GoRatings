@@ -176,7 +176,7 @@ class Game:
         if self.winner == self.rating1:
             result1 = 1
             result2 = 0
-        else:
+        elif self.winner == self.rating2:
             result2 = 1
             result1 = 0
         #There can be only one winner.
@@ -219,15 +219,17 @@ def process_cmdline(argv):
     parser.add_option('-h', '--help', action='help',
                       help='Show this help message and exit')
     opts, args = parser.parse_args(argv)
-    if opts.username is None or opts.password is None:
-        parser.error('username and password required')
-    if opts.username != 'phgo.ratings@gmail.com':
-        parser.error('username incorrect')
-    if opts.add_player and opts.add_player_only:
-        parser.error('options -a and --add-player-only are mutually exclusive')
-    if opts.sync_ratings and opts.sync_ratings_only:
-        parser.error(
-            'options -s and --sync-ratings-only are mutually exclusive')
+    if opts.rate is None:
+        if opts.username is None or opts.password is None:
+            parser.error('username and password required')
+        if opts.username != 'phgo.ratings@gmail.com':
+            parser.error('username incorrect')
+        if opts.add_player and opts.add_player_only:
+            parser.error(
+                'options -a and --add-player-only are mutually exclusive')
+        if opts.sync_ratings and opts.sync_ratings_only:
+            parser.error(
+                'options -s and --sync-ratings-only are mutually exclusive')
     if args:
         parser.error('program takes no command-line arguments; '
                      '"%s" ignored.' % (args,))
