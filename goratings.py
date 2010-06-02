@@ -114,7 +114,7 @@ class Database:
         for row in rows:
             if '.' in row.content['rating']:
                 rounded = round(float(row.content['rating']))
-                row.content['rating'] = rounded
+                row.content['rating'] = str(rounded)
                 row.Push()
 
 
