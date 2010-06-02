@@ -212,6 +212,8 @@ def process_cmdline(argv):
                       dest='sync_ratings')
     parser.add_option('--sync-ratings-only', action='store_true',
                       dest='sync_ratings_only')
+    parser.add_option('--publish-only', action='store_true',
+                      dest='publish_only')
     parser.add_option('-b', '--publish', action='store_true')
     parser.add_option('-d', '--dry-run', action='store_true', dest='dry_run')
     parser.add_option('-r', '--rate', nargs=5,
@@ -230,6 +232,9 @@ def process_cmdline(argv):
         if opts.sync_ratings and opts.sync_ratings_only:
             parser.error(
                 'options -s and --sync-ratings-only are mutually exclusive')
+        if opts.publish and opts.publish_only:
+            parser.error(
+                'options -b and --publish-only are mutually exclusive')
     if args:
         parser.error('program takes no command-line arguments; '
                      '"%s" ignored.' % (args,))
@@ -257,6 +262,9 @@ def main(argv=None):
         phgo.SyncRatings()
         if opts.sync_ratings_only:
             return 0
+    if opts.publish_only:
+        phgo.Publish()
+        return 0
     games = phgo.GetGames()
     for pid1, rating1, pid2, rating2, handi, tc in games:
         match = Game(rating1, rating2, winner=rating1, handi=handi, tc=tc)
