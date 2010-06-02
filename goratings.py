@@ -26,6 +26,10 @@ class Database:
         self.db = self.client.GetDatabases(name='Sid')[0]
         self.players_table = self.db.GetTables(name='players')[0]
         self.games_table = self.db.GetTables(name='games')[0]
+        # Mapping of ratings to kyu and dan grades.
+        self.grades = dict([(x, str(20 - (x - 100) / 100) + 'k')
+            for x in range(100, 2100, 100)] + [(x, str((x - 2000) / 100) + 'd')
+            for x in range(2100, 2800, 100)] + [(0, '20k')])
 
     def SyncRatings(self):
         """Synchronizes the Rating in the Players worksheet
@@ -88,10 +92,6 @@ class Database:
         return results
 
     def UpdateRating(self, pid, increment, dry_run):
-        # Mapping of ratings to kyu and dan grades.
-        self.grades = dict([(x, str(20 - (x - 100) / 100) + 'k')
-            for x in range(100, 2100, 100)] + [(x, str((x - 2000) / 100) + 'd')
-            for x in range(2100, 2800, 100)] + [(0, '20k')])
         record = self.players_table.FindRecords('id == ' + str(pid))[0]
         rating = float(record.content['rating'])
         newrating = rating + increment
